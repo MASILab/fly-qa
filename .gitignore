@@ -10,6 +10,9 @@ fly_qa_results.csv
 # uv lockfile -- project uses venv + pip (see README), not uv
 uv.lock
 
+# macOS Finder metadata
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

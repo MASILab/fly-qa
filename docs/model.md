@@ -199,6 +199,64 @@ evidenced improvement over the original `defect_score` readout -- roughly 2x
 better recall at matched false-positive rates -- but it does not make this a
 working defect detector. Report exactly this, not a rounded-up version of it.
 
+## Apples-vs-oranges spike (`scripts/generate_fruit_demo.py`)
+
+A user-reported accuracy bug ("failures that shouldn't pass end up
+passing") prompted testing the pipeline on a much easier, strongly-colored
+synthetic task -- apple (pass) vs orange (fail) -- to check whether the
+architecture works at all when given a clear signal, independent of
+TractSeg-specific difficulty. First pass performed barely above chance
+(56.7% best-threshold accuracy on raw encoder input) -- traced to the same
+root cause as the tractogram case: `encoder.py`'s whole-image hue averaging
+is dominated by the majority-background pixels (the fruit covers only
+~20-30% of the frame), and a real synthetic-background color cast (present
+in both classes, but still a large fraction of the pixels) swamps the small
+number of genuinely informative fruit-colored cells once aggregated.
+
+**Fix:** `_sample_chrominance_grid()` in `encoder.py` now computes a
+saturation-weighted circular mean per cell (correct math for a circular
+quantity) AND gates each cell's contribution by its own saturation
+(confidence) -- `signal = hue * saturation` -- so low-saturation background
+cells contribute near-zero regardless of their nominal hue reading, instead
+of a stable-but-irrelevant color swamping the aggregate.
+
+**Result, held-out, never used for threshold-picking**
+(`scripts/calibrate_and_validate_folders.py --good-dir .../apples --bad-dir
+.../oranges`, 25+25 calibration, 25+25 held-out, `leak=0.2`, `steps=30`):
+
+| False-flag budget | Held-out sensitivity | Held-out specificity |
+|---|---|---|
+| 5% | 16.0% | 100.0% |
+| 20% | 48.0% | 96.0% |
+
+This is a real, meaningful result for a frozen, untrained biological network
+-- clearly better than chance, in the direction the fix predicted.
+
+**Important caveat, tested and confirmed:** the same fix that helped here
+*regressed* real TractSeg separation (best-threshold accuracy 72.2% with
+the original buggy encoder -> 61.1% with confidence-gating; the
+circular-mean fix alone, without gating, scored even lower at 57.4%). Both
+"more mathematically correct" encoder changes helped the easy synthetic
+task and hurt the real one. The deepest finding from this whole
+investigation: **because the connectome is frozen, real biological wiring
+-- never trained for this task -- there is no reliable relationship between
+"more correct" input encoding and downstream classification accuracy.**
+Small, well-justified encoder changes can help one task and hurt another
+unpredictably, because there's no gradient connecting encoding quality to
+network output the way there would be in a trained model. The original
+bug's specific error pattern happened to correlate with real streamline
+coverage better than either principled fix, for reasons that would need
+much more investigation to explain.
+
+**Current decision (2026-09-13):** the confidence-gating fix is being kept
+as the default encoder, and current focus is the apples/oranges task and
+similar simple sanity checks, not real TractSeg accuracy -- see project
+conversation for the reasoning. If TractSeg QA becomes the priority again,
+re-run `scripts/calibrate_on_real_labels.py` +
+`scripts/validate_on_real_labels.py` first; don't assume either previous
+number still holds without re-measuring, since further encoder changes are
+likely.
+
 ### What still doesn't work, and why
 
 The decoder fix addressed one confirmed bug (an information-destroying

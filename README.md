@@ -77,6 +77,23 @@ and a results table. Click any row's filename to review that image, its
 scores, and a replay of its real neuron activity, even after inference has
 moved on to later images.
 
+## Apples-vs-oranges spike
+
+A simpler sanity-check task than TractSeg QA, currently the active focus --
+see [`docs/model.md`](docs/model.md#apples-vs-oranges-spike-scriptsgenerate_fruit_demopy)
+for the full story (why it was added, what it found, and an important
+caveat about the fix it drove not generalizing back to TractSeg).
+
+```
+python scripts/generate_fruit_demo.py --output-dir .devtest/fruit_demo --n-per-class 50
+python scripts/calibrate_and_validate_folders.py \
+    --good-dir .devtest/fruit_demo/apples --bad-dir .devtest/fruit_demo/oranges \
+    --connectome-export ~/.cache/fly_qa/connectome_export
+```
+
+`calibrate_and_validate_folders.py` is generic (any two-folder good/bad PNG
+dataset), not fruit-specific.
+
 ## Validation protocol
 
 Two separate validation paths -- see [`docs/model.md`](docs/model.md) for

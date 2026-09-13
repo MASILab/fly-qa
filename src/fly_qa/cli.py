@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 
 from fly_qa.connectome_data import ConnectomeGraph, build_connectome_graph, body_ids_by_type, load_connectome_export
+from fly_qa.decoder import DecoderThresholds
 from fly_qa.events import EventBus, ResultEvent
 from fly_qa.pipeline import R8_TYPES, PipelineConfig, run_pipeline
 from fly_qa.simulator import ConnectomeSimulator
@@ -31,6 +32,32 @@ RESULT_FIELDNAMES = [
     "path", "precheck_passed", "precheck_findings", "fed_to_connectome",
     "defect_score", "confidence_signal", "verdict", "calibrated", "duration_sec",
 ]
+
+
+def resolve_thresholds(
+    loaded: DecoderThresholds,
+    confidence_fail_max: float | None,
+    confidence_flag_max: float | None,
+) -> DecoderThresholds:
+    """Apply CLI --confidence-fail-max/--confidence-flag-max overrides onto thresholds
+    loaded from a file, keeping flag_max >= fail_max so both tiers stay reachable.
+
+    decode() checks fail_max first: if flag_max carried over from the loaded file were
+    left below a newly-overridden (higher) fail_max, the flag tier would be dead code --
+    any confidence low enough to hit it would already have hit fail_max first.
+    """
+    if confidence_fail_max is None and confidence_flag_max is None:
+        return loaded
+
+    new_fail_max = confidence_fail_max if confidence_fail_max is not None else loaded.confidence_fail_max
+    new_flag_max = confidence_flag_max if confidence_flag_max is not None else loaded.confidence_flag_max
+    new_flag_max = max(new_flag_max, new_fail_max)
+
+    return DecoderThresholds(
+        confidence_fail_max=new_fail_max,
+        confidence_flag_max=new_flag_max,
+        calibrated=True,  # explicitly set by the user -- not an uncalibrated placeholder
+    )
 
 
 def find_pngs(root: Path) -> list[Path]:
@@ -89,6 +116,9 @@ def run(
     grid_size: tuple[int, int],
     launch_dashboard: bool,
     port: int | None,
+    thresholds_path: Path | None = None,
+    confidence_fail_max: float | None = None,
+    confidence_flag_max: float | None = None,
 ) -> int:
     print(BANNER)
 
@@ -105,7 +135,15 @@ def run(
           f"({len(config.r1_r6_ids)} R1-R6, {len(config.r8_ids)} R8-family, "
           f"DNp20 L={config.dnp20_left_id}/R={config.dnp20_right_id}, {len(config.dnpe017_ids)} DNpe017)")
 
-    thresholds = load_thresholds()
+    loaded_thresholds = load_thresholds(thresholds_path)
+    thresholds = resolve_thresholds(loaded_thresholds, confidence_fail_max, confidence_flag_max)
+    if confidence_fail_max is not None or confidence_flag_max is not None:
+        print(f"Using manually-overridden thresholds: fail<={thresholds.confidence_fail_max:.6g}, "
+              f"flag<={thresholds.confidence_flag_max:.6g}")
+    elif thresholds_path is not None:
+        print(f"Loaded thresholds from {thresholds_path}: fail<={thresholds.confidence_fail_max:.6g}, "
+              f"flag<={thresholds.confidence_flag_max:.6g}")
+
     if not thresholds.calibrated:
         print("WARNING: decoder thresholds are UNCALIBRATED placeholders. "
               "Run scripts/run_validation.py before trusting any verdict.")
@@ -206,6 +244,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--grid-size", type=int, nargs=2, default=(256, 256), metavar=("W", "H"))
     parser.add_argument("--no-dashboard", action="store_true", help="Don't launch the live web dashboard")
     parser.add_argument("--port", type=int, default=None, help="Dashboard port (default: auto-pick)")
+    parser.add_argument(
+        "--thresholds", type=Path, default=None,
+        help="Path to a decoder_thresholds.json file (default: the shipped calibrated thresholds). "
+             "e.g. .devtest/fruit_demo/decoder_thresholds.json for the fruit-calibrated ones.",
+    )
+    parser.add_argument(
+        "--confidence-fail-max", type=float, default=None,
+        help="Override: verdict is 'fail' when confidence_signal <= this value (bypasses --thresholds)",
+    )
+    parser.add_argument(
+        "--confidence-flag-max", type=float, default=None,
+        help="Override: verdict is 'flag' when confidence_signal <= this value (bypasses --thresholds)",
+    )
     args = parser.parse_args(argv)
 
     if not args.path.exists():
@@ -222,6 +273,9 @@ def main(argv: list[str] | None = None) -> int:
     return run(
         args.path, args.connectome_export, args.output, args.leak, args.steps,
         tuple(args.grid_size), not args.no_dashboard, args.port,
+        thresholds_path=args.thresholds,
+        confidence_fail_max=args.confidence_fail_max,
+        confidence_flag_max=args.confidence_flag_max,
     )
 
 
