@@ -1,0 +1,19 @@
+{
+  "confidence_fail_max": 2.5082477832172163e-06,
+  "confidence_flag_max": 2.6747804362216257e-06,
+  "calibrated": true,
+  "generated_at": "2026-09-13T19:56:21.763960+00:00",
+  "notes": {
+    "calibration_method": "real_labels",
+    "n_good": 150,
+    "n_bad": 81,
+    "in_sample_recall": 0.07407407407407407,
+    "in_sample_false_flag_rate": 0.04666666666666667,
+    "leak": 0.2,
+    "steps": 30,
+    "source_root": "examples",
+    "excluded_studies": [
+      "study_226"
+    ]
+  }
+}

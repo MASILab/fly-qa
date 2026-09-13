@@ -1,3 +1,15 @@
+# fly_qa dev scratch (never commit real QA labels copied here for local testing)
+.devtest/
+
+# Real study data (1.1GB+, includes subject identifiers) -- kept out of git history
+examples/
+
+# fly-qa CLI run output
+fly_qa_results.csv
+
+# uv lockfile -- project uses venv + pip (see README), not uv
+uv.lock
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

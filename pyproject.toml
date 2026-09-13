@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fly-qa"
+version = "0.1.0"
+description = "PNGQAFly: a connectome-driven image QA scanner (EXPERIMENTAL / UNVALIDATED)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=10",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "python-dotenv>=1.0",
+    "neuprint-python>=0.5",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "ruff"]
+
+[project.scripts]
+fly-qa = "fly_qa.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fly_qa"]
