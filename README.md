@@ -79,10 +79,14 @@ moved on to later images.
 
 ## Apples-vs-oranges spike
 
-A simpler sanity-check task than TractSeg QA, currently the active focus --
-see [`docs/model.md`](docs/model.md#apples-vs-oranges-spike-scriptsgenerate_fruit_demopy)
-for the full story (why it was added, what it found, and an important
-caveat about the fix it drove not generalizing back to TractSeg).
+A simpler sanity-check task than TractSeg QA -- see
+[`docs/model.md`](docs/model.md#apples-vs-oranges-spike-scriptsgenerate_fruit_demopy)
+for the full story. The encoder fix it drove (confidence-gated
+chrominance) was re-measured against real TractSeg data with the full
+calibration+held-out protocol and turned out to be a net win there too
+(held-out sensitivity roughly doubled, 4.8% -> 9.7%) -- an earlier,
+smaller diagnostic had wrongly suggested a regression; see `docs/model.md`
+for why.
 
 ```
 python scripts/generate_fruit_demo.py --output-dir .devtest/fruit_demo --n-per-class 50
@@ -115,9 +119,11 @@ Both write calibrated thresholds to `src/fly_qa/data/decoder_thresholds.json`
 (confidence-based -- see below).
 
 **The honest result, on both paths, is still negative: held-out recall on
-real QA failures is ~5-15%.** The decoder was fixed to threshold on
-`confidence_signal` rather than `defect_score` after a user-reported
-accuracy bug traced to a real cause (the original DNp20 left-right
+real QA failures is ~5-15%** (currently 9.7% on real TractSeg labels after
+the confidence-gating encoder fix, up from 4.8% before it -- see
+`docs/model.md` for the full before/after). The decoder was fixed to
+threshold on `confidence_signal` rather than `defect_score` after a
+user-reported accuracy bug traced to a real cause (the original DNp20 left-right
 difference readout was measurably *destroying* signal an unsigned sum
 preserves -- see `docs/model.md`), which is a genuine ~2x improvement, but
 the deeper bottleneck is in the encoder, not the decoder, and remains open.

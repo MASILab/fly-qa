@@ -187,17 +187,28 @@ not generic PNG corruption. Calibrated on 150 real `yes` + 81 real
 (`study_226` hard-excluded from calibration); held out against
 `study_226` (150 `yes` + 62 `no`/`maybe`, never seen during calibration):
 
-| Set | n | sensitivity | specificity |
-|---|---|---|---|
-| Calibration (in-sample) | 231 (81 bad, 150 good) | 7.4% | 95.3% |
-| Held-out (`study_226`, frozen weights) | 212 (62 bad, 150 good) | **4.8%** | 92.7% |
+Re-run after the apples/oranges-driven encoder change (confidence-gated
+chrominance, see next section) to check whether it helped or hurt the real
+task -- both runs shown, same protocol, same held-out set:
+
+| Set | n | Encoder | sensitivity | specificity |
+|---|---|---|---|---|
+| Calibration (in-sample) | 231 (81 bad, 150 good) | pre-gating | 7.4% | 95.3% |
+| Held-out (`study_226`) | 212 (62 bad, 150 good) | pre-gating | 4.8% | 92.7% |
+| Calibration (in-sample) | 231 (81 bad, 150 good) | **confidence-gated (current)** | 8.6% | 95.3% |
+| Held-out (`study_226`) | 212 (62 bad, 150 good) | **confidence-gated (current)** | **9.7%** | 87.3% |
 
 **Reading this honestly: the tool still misses the large majority of real
-QA failures (95.2% of real `no`/`maybe` images pass on held-out data).** The
-`confidence_signal` decoder fix (see Decoder section above) is a real,
-evidenced improvement over the original `defect_score` readout -- roughly 2x
-better recall at matched false-positive rates -- but it does not make this a
-working defect detector. Report exactly this, not a rounded-up version of it.
+QA failures (90.3% of real `no`/`maybe` images pass on held-out data).**
+But the confidence-gating encoder fix -- driven by the apples/oranges spike,
+not by TractSeg -- turned out to roughly **double** held-out recall (4.8%
+-> 9.7%) at a real but modest specificity cost (92.7% -> 87.3%), when
+measured with the actual calibration+held-out protocol used for
+deployment. See the next section for why an earlier, smaller diagnostic
+(n=54, 3 bundles, a different metric) wrongly suggested this fix was a
+regression -- that finding is superseded by this fuller measurement.
+Neither number makes this a working defect detector; report exactly this,
+not a rounded-up version of it.
 
 ## Apples-vs-oranges spike (`scripts/generate_fruit_demo.py`)
 
@@ -232,30 +243,34 @@ of a stable-but-irrelevant color swamping the aggregate.
 This is a real, meaningful result for a frozen, untrained biological network
 -- clearly better than chance, in the direction the fix predicted.
 
-**Important caveat, tested and confirmed:** the same fix that helped here
-*regressed* real TractSeg separation (best-threshold accuracy 72.2% with
-the original buggy encoder -> 61.1% with confidence-gating; the
-circular-mean fix alone, without gating, scored even lower at 57.4%). Both
-"more mathematically correct" encoder changes helped the easy synthetic
-task and hurt the real one. The deepest finding from this whole
-investigation: **because the connectome is frozen, real biological wiring
--- never trained for this task -- there is no reliable relationship between
-"more correct" input encoding and downstream classification accuracy.**
-Small, well-justified encoder changes can help one task and hurt another
-unpredictably, because there's no gradient connecting encoding quality to
-network output the way there would be in a trained model. The original
-bug's specific error pattern happened to correlate with real streamline
-coverage better than either principled fix, for reasons that would need
-much more investigation to explain.
+**Superseded caveat (kept for the record, corrected below):** an initial,
+smaller diagnostic (n=54 real images, 3 bundles) using a *different* metric
+(best-threshold accuracy at any operating point, not a calibrated
+false-flag budget) suggested this fix regressed real TractSeg separation
+(72.2% -> 61.1%). Re-measured with the actual deployment protocol
+(`scripts/calibrate_on_real_labels.py` + `validate_on_real_labels.py`,
+231 calibration + 212 held-out real images, the full labeled set) the fix
+is a net improvement on the real task too -- see the updated table in the
+"Validation results" section above (held-out sensitivity 4.8% -> 9.7%).
+**Lesson: a small diagnostic sample and an unbudgeted "best accuracy"
+metric can disagree with the actual calibrated, held-out result -- trust
+the full calibration+held-out protocol over an ad hoc diagnostic, and
+re-measure rather than reason from a smaller/earlier test.**
 
-**Current decision (2026-09-13):** the confidence-gating fix is being kept
-as the default encoder, and current focus is the apples/oranges task and
-similar simple sanity checks, not real TractSeg accuracy -- see project
-conversation for the reasoning. If TractSeg QA becomes the priority again,
-re-run `scripts/calibrate_on_real_labels.py` +
-`scripts/validate_on_real_labels.py` first; don't assume either previous
-number still holds without re-measuring, since further encoder changes are
-likely.
+The deeper finding from this investigation still stands, just with a more
+fortunate outcome than first measured: **because the connectome is frozen,
+real biological wiring -- never trained for this task -- there is no
+reliable, predictable relationship between "more correct" input encoding
+and downstream classification accuracy**, so any future encoder change
+needs to be re-measured on both tasks with the full protocol, not assumed
+to transfer in either direction.
+
+**Current decision (2026-09-13):** the confidence-gating fix is kept as the
+default encoder. It now measures as a modest net win on both the
+apples/oranges spike and real TractSeg QA. Current focus remains the
+apples/oranges task per project conversation, but TractSeg accuracy is no
+longer known to be regressed -- re-run both validation scripts after any
+further encoder change rather than assuming either direction.
 
 ### What still doesn't work, and why
 
