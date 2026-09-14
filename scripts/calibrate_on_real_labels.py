@@ -99,7 +99,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--leak", type=float, default=0.2)
     parser.add_argument("--steps", type=int, default=30)
-    parser.add_argument("--max-per-class", type=int, default=150, help="Cap on yes/non-yes examples each, for runtime")
+    parser.add_argument(
+        "--max-per-class", type=int, default=150,
+        help="Cap on yes/non-yes examples each, for runtime. 0 (or negative) = no cap, use all labeled examples.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output-thresholds", type=Path, default=Path(str(DEFAULT_THRESHOLDS_PATH)))
     parser.add_argument(
@@ -132,9 +135,10 @@ def main(argv: list[str] | None = None) -> int:
 
     rng.shuffle(good_paths)
     rng.shuffle(bad_paths)
-    good_paths = good_paths[: args.max_per_class]
-    # use ALL real non-yes examples (there are few) up to the cap
-    bad_paths = bad_paths[: args.max_per_class]
+    if args.max_per_class > 0:
+        good_paths = good_paths[: args.max_per_class]
+        # use ALL real non-yes examples (there are few) up to the cap
+        bad_paths = bad_paths[: args.max_per_class]
 
     print(f"Calibrating on {len(good_paths)} real 'yes' + {len(bad_paths)} real 'no'/'maybe' images "
           f"from {args.root} (excluding {excluded})")

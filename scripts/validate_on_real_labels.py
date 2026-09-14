@@ -62,7 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--leak", type=float, default=0.2)
     parser.add_argument("--steps", type=int, default=30)
-    parser.add_argument("--max-per-class", type=int, default=150)
+    parser.add_argument(
+        "--max-per-class", type=int, default=150,
+        help="Cap on yes/non-yes examples each, for runtime. 0 (or negative) = no cap, use all labeled examples.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
         "--process-glob", type=str, default="Tractseg_*", metavar="PATTERN",
@@ -87,8 +90,10 @@ def main(argv: list[str] | None = None) -> int:
         (good_paths if status == "yes" else bad_paths).append(path)
 
     rng.shuffle(good_paths)
-    good_paths = good_paths[: args.max_per_class]
-    bad_paths = bad_paths[: args.max_per_class]
+    rng.shuffle(bad_paths)
+    if args.max_per_class > 0:
+        good_paths = good_paths[: args.max_per_class]
+        bad_paths = bad_paths[: args.max_per_class]
     print(f"Held-out check on {args.study_dir}: {len(good_paths)} real 'yes', {len(bad_paths)} real 'no'/'maybe' "
           f"(fail<={thresholds.confidence_fail_max:.6g}, flag<={thresholds.confidence_flag_max:.6g})")
 

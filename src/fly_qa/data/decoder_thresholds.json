@@ -1,19 +1,20 @@
 {
-  "confidence_fail_max": 3.31616458873801e-06,
-  "confidence_flag_max": 3.3351956119505075e-06,
+  "confidence_fail_max": 4.692771208026935e-06,
+  "confidence_flag_max": 4.736919046943899e-06,
   "calibrated": true,
-  "generated_at": "2026-09-13T23:15:03.305574+00:00",
+  "generated_at": "2026-09-14T19:02:38.849043+00:00",
   "notes": {
     "calibration_method": "real_labels",
     "n_good": 150,
-    "n_bad": 81,
-    "in_sample_recall": 0.08641975308641975,
+    "n_bad": 150,
+    "in_sample_recall": 0.8666666666666667,
     "in_sample_false_flag_rate": 0.04666666666666667,
     "leak": 0.2,
     "steps": 30,
-    "source_root": "examples",
+    "source_root": "haca3_harmonized",
     "excluded_studies": [
-      "study_226"
-    ]
+      "study_267"
+    ],
+    "process_glob": "Tractseg_*"
   }
 }
