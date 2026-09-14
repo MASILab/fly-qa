@@ -5,6 +5,16 @@ production QA tool -- say that up front, the same way
 [DoomFly](https://github.com/nftechie/doomfly) and
 [StonkFly](https://github.com/nftechie/stonkfly) do about themselves.
 
+The QA workflow itself -- the `QA.csv` schema (`filename, QA_status, reason,
+user, date, duration`), the `yes`/`no`/`maybe` status convention, and both
+folder layouts this project reads (flat `{study}/QA.csv` with PNGs directly
+in the study folder, and nested `{study}/{process}/QA.csv` per its BIDS
+mode) -- is based on
+[MASILab/masi-qa](https://github.com/MASILab/masi-qa), a keyboard-driven
+tool for rapid *human* QA review. This project automates that same
+workflow's output format with a connectome-driven decision instead of (or
+alongside) a human reviewer; it does not replace masi-qa's own review UI.
+
 A connectome-driven image QA scanner: the retained MaleCNS v1.0 fly-brain
 connectome (~165K neurons, ~25.6M synapses, used **unmodified**) sits
 between a task-specific sensory encoder (image -> photoreceptor input) and
@@ -98,30 +108,63 @@ python scripts/calibrate_and_validate_folders.py \
 `calibrate_and_validate_folders.py` is generic (any two-folder good/bad PNG
 dataset), not fruit-specific.
 
+## Retuning on your own QA dataset
+
+To calibrate (or re-calibrate) decoder thresholds against any labeled
+dataset in the masi-qa format, holding out a study to test on:
+
+```
+# 1. Calibrate on every study except the one(s) you hold out.
+#    --exclude-study is required (repeatable) -- there is no default, so a
+#    held-out study can never be silently included by forgetting the flag.
+python scripts/calibrate_on_real_labels.py <path-to-your-dataset>/ \
+    --exclude-study "study #1" \
+    --connectome-export ~/.cache/fly_qa/connectome_export
+
+# 2. Validate on exactly the study you excluded -- the honest, unbiased number.
+python scripts/validate_on_real_labels.py "<path-to-your-dataset>/study #1" \
+    --connectome-export ~/.cache/fly_qa/connectome_export
+```
+
+Both scripts auto-detect either masi-qa layout per study folder -- flat
+(`{study}/QA.csv` + PNGs directly in the study folder) and nested/BIDS mode
+(`{study}/{process}/QA.csv`, process folders matched by `--process-glob`,
+default `Tractseg_*` for backward compatibility with the original TractSeg
+dataset this project was built against -- pass `--process-glob "*"` or your
+own pattern for a differently-named pipeline). A study-level `QA.csv` whose
+filenames are path-prefixed (e.g. `BRAID/sub-....png`) is treated as an
+aggregate rollup of a nested layout, not a flat one, and skipped to avoid
+double-counting those images.
+
+Calibration writes to `src/fly_qa/data/decoder_thresholds.json` by default
+(`--output-thresholds <path>` to save elsewhere; pass the matching
+`--thresholds <path>` to `validate_on_real_labels.py` and to `fly-qa`
+itself to use it). `fly-qa` also accepts `--confidence-fail-max` /
+`--confidence-flag-max` to override threshold values directly without a
+calibration file, for quick experimentation.
+
+**Practical notes, from doing this on real data:** pick a held-out study
+with a real mix of both classes -- a study with zero `no`/`maybe` examples
+tells you nothing about recall. Runtime is roughly 1 real second per image
+through the actual connectome simulation, so a few thousand images across
+calibration + held-out is tens of minutes, not seconds. `--max-per-class`
+caps the `yes` sample size for runtime (all non-`yes` examples are always
+used, since real datasets are typically 95%+ `yes`).
+
 ## Validation protocol
 
-Two separate validation paths -- see [`docs/model.md`](docs/model.md) for
-full numbers and what each actually tests:
+The build spec's own Section 5 protocol -- generic synthetic PNG defects
+(color shift, banding, corruption, alpha loss, resolution mismatch) rather
+than real labeled data -- is a separate path, useful mainly as a sanity
+check independent of any specific dataset:
 
 ```
-# Section 5's own protocol: generic synthetic PNG defects
 python scripts/run_validation.py --good-images-dir <dir-of-known-good-pngs> \
     --connectome-export ~/.cache/fly_qa/connectome_export
-
-# Calibrate/validate against the real TractSeg failure mode instead.
-# --exclude-study is required (repeatable) -- name whichever study folder(s)
-# you're holding out for testing; they're never touched during calibration.
-python scripts/calibrate_on_real_labels.py examples/ \
-    --exclude-study study_226 \
-    --connectome-export ~/.cache/fly_qa/connectome_export
-python scripts/validate_on_real_labels.py examples/study_226 \
-    --connectome-export ~/.cache/fly_qa/connectome_export
 ```
 
-Both write calibrated thresholds to `src/fly_qa/data/decoder_thresholds.json`
-(confidence-based -- see below).
-
-**The honest result, on both paths, is still negative: held-out recall on
+See [`docs/model.md`](docs/model.md) for full numbers from both protocols.
+**The honest result on real QA data is still negative: held-out recall on
 real QA failures is ~5-15%** (currently 9.7% on real TractSeg labels after
 the confidence-gating encoder fix, up from 4.8% before it -- see
 `docs/model.md` for the full before/after). The decoder was fixed to
