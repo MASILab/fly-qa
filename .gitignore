@@ -1,8 +1,12 @@
 # fly_qa dev scratch (never commit real QA labels copied here for local testing)
 .devtest/
 
-# Real study data (1.1GB+, includes subject identifiers) -- kept out of git history
+# Real study data (includes subject identifiers) -- kept out of git history.
+# New datasets should go under examples/ if possible so this list doesn't need
+# a new entry every time; haca3_harmonized/ is here because it landed at the
+# repo root instead (2.1GB, study_220/226/228/234/239/246/254/...).
 examples/
+haca3_harmonized/
 
 # fly-qa CLI run output
 fly_qa_results.csv

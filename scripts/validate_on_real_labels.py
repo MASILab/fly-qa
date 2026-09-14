@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Honest held-out check of the calibrated decoder against real labeled TractSeg
-QA data from study_226 -- never used by scripts/calibrate_on_real_labels.py.
+QA data from a study folder. Point this at whatever study(s) you passed to
+scripts/calibrate_on_real_labels.py --exclude-study -- it must never have been
+part of calibration, or this isn't a real held-out check.
 
 Usage:
     python scripts/validate_on_real_labels.py examples/study_226 \\
@@ -23,8 +25,11 @@ from fly_qa.thresholds_store import load_thresholds
 BANNER = "*** EXPERIMENTAL / UNVALIDATED -- research/art exercise, not a validated defect classifier ***"
 
 
-def iter_labeled_examples_in(study_dir: Path):
-    for qa_path in sorted(study_dir.glob("Tractseg_*/QA.csv")):
+def iter_labeled_examples_in(study_dir: Path, process_glob: str = "Tractseg_*"):
+    """Supports both nested ({study}/{process}/QA.csv) and flat ({study}/QA.csv) layouts --
+    see calibrate_on_real_labels.iter_labeled_examples for the full explanation, including
+    why a flat QA.csv's path-prefixed filename rows (aggregate rollups) are skipped."""
+    for qa_path in sorted(study_dir.glob(f"{process_glob}/QA.csv")):
         with qa_path.open(newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         for row in rows:
@@ -32,6 +37,19 @@ def iter_labeled_examples_in(study_dir: Path):
             if status not in ("yes", "no", "maybe"):
                 continue
             png_path = qa_path.parent / row["filename"]
+            if png_path.exists():
+                yield png_path, status
+
+    flat_qa = study_dir / "QA.csv"
+    if flat_qa.is_file():
+        with flat_qa.open(newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        for row in rows:
+            status = row.get("QA_status", "")
+            filename = row.get("filename", "")
+            if status not in ("yes", "no", "maybe") or "/" in filename or "\\" in filename:
+                continue
+            png_path = flat_qa.parent / filename
             if png_path.exists():
                 yield png_path, status
 
@@ -46,17 +64,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--steps", type=int, default=30)
     parser.add_argument("--max-per-class", type=int, default=150)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--process-glob", type=str, default="Tractseg_*", metavar="PATTERN",
+        help="Must match what you passed to calibrate_on_real_labels.py --process-glob.",
+    )
+    parser.add_argument(
+        "--thresholds", type=Path, default=None,
+        help="Path to the calibrated thresholds file (default: the shipped one -- "
+             "must match --output-thresholds from calibrate_on_real_labels.py if you used it).",
+    )
     args = parser.parse_args(argv)
 
     print(BANNER)
-    thresholds = load_thresholds()
+    thresholds = load_thresholds(args.thresholds)
     if not thresholds.calibrated:
         print("error: no calibrated thresholds found -- run scripts/calibrate_on_real_labels.py first", file=sys.stderr)
         return 1
 
     rng = random.Random(args.seed)
     good_paths, bad_paths = [], []
-    for path, status in iter_labeled_examples_in(args.study_dir):
+    for path, status in iter_labeled_examples_in(args.study_dir, args.process_glob):
         (good_paths if status == "yes" else bad_paths).append(path)
 
     rng.shuffle(good_paths)
@@ -90,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sensitivity = tp / (tp + fn) if (tp + fn) else float("nan")
     specificity = tn / (tn + fp) if (tn + fp) else float("nan")
-    print(f"\nHeld-out (study_226, never used for calibration):")
+    print(f"\nHeld-out ({args.study_dir}, never used for calibration):")
     print(f"  sensitivity (recall on real no/maybe) = {sensitivity:.1%}  ({tp}/{tp+fn})")
     print(f"  specificity (real yes correctly passed) = {specificity:.1%}  ({tn}/{tn+fp})")
     print("matches this rule on this held-out set -- NOT a validated defect classifier.")

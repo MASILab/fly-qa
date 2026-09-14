@@ -108,8 +108,11 @@ full numbers and what each actually tests:
 python scripts/run_validation.py --good-images-dir <dir-of-known-good-pngs> \
     --connectome-export ~/.cache/fly_qa/connectome_export
 
-# Calibrate/validate against the real TractSeg failure mode instead
+# Calibrate/validate against the real TractSeg failure mode instead.
+# --exclude-study is required (repeatable) -- name whichever study folder(s)
+# you're holding out for testing; they're never touched during calibration.
 python scripts/calibrate_on_real_labels.py examples/ \
+    --exclude-study study_226 \
     --connectome-export ~/.cache/fly_qa/connectome_export
 python scripts/validate_on_real_labels.py examples/study_226 \
     --connectome-export ~/.cache/fly_qa/connectome_export
