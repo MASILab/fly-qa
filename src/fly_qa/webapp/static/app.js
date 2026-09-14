@@ -2,6 +2,9 @@ const brainCanvas = document.getElementById("brain-canvas");
 const brain = new NeuronCanvas(brainCanvas);
 const brainCaption = document.getElementById("brain-caption");
 
+const deskCanvas = document.getElementById("fly-desk-canvas");
+const flyDesk = typeof THREE !== "undefined" && deskCanvas ? new FlyDesk3D(deskCanvas) : null;
+
 const tallyEls = {
   pass: document.getElementById("tally-pass"),
   flag: document.getElementById("tally-flag"),
@@ -105,6 +108,7 @@ function showResult(path) {
 
   currentThumb.src = imageUrl(path);
   currentThumb.hidden = false;
+  if (flyDesk) flyDesk.setScreenImage(imageUrl(path));
 
   if (event.step_activity) {
     brain.playSequence(event.step_activity, event.verdict);

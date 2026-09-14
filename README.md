@@ -87,6 +87,12 @@ and a results table. Click any row's filename to review that image, its
 scores, and a replay of its real neuron activity, even after inference has
 moved on to later images.
 
+Below that, a purely decorative (but real-time) 3D scene: the fly, at its
+desk, with the monitor showing whatever image is currently being reviewed
+(the same feed as the 2D thumbnail above it) -- drag to look around. Built
+with [Three.js](https://threejs.org/) (MIT license, vendored locally at
+`static/vendor/` so the dashboard works offline like everything else here).
+
 ## Apples-vs-oranges spike
 
 A simpler sanity-check task than TractSeg QA -- see
