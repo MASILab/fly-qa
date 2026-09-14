@@ -26,8 +26,8 @@ class FlyDesk3D {
 
   _initScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x05080a);
-    this.scene.fog = new THREE.Fog(0x05080a, 8, 20);
+    this.scene.background = new THREE.Color(0x0a1410);
+    this.scene.fog = new THREE.Fog(0x0a1410, 14, 34);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     this.camera.position.set(3.2, 2.6, 4.2);
@@ -37,22 +37,36 @@ class FlyDesk3D {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
 
-    const ambient = new THREE.AmbientLight(0x8899aa, 0.55);
+    const ambient = new THREE.AmbientLight(0xaabbdd, 1.0);
     this.scene.add(ambient);
 
-    const key = new THREE.PointLight(0xfff2cc, 1.1, 12);
+    const key = new THREE.PointLight(0xfff2cc, 1.4, 14);
     key.position.set(1.5, 3.2, 1.8);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     this.scene.add(key);
 
-    const rim = new THREE.PointLight(0x39ff6a, 0.6, 10);
+    const rim = new THREE.PointLight(0x39ff6a, 0.7, 10);
     rim.position.set(-2, 1.6, -1.5);
     this.scene.add(rim);
+
+    const fill = new THREE.HemisphereLight(0xbfe8ff, 0x14201a, 0.5);
+    this.scene.add(fill);
+
+    // A literal spotlight on the fly, per request -- follows it via .target
+    // (kept up to date each frame in _animate, in case the fly's position ever
+    // changes), giving it a bright, distinct pool of light against the room.
+    const spot = new THREE.SpotLight(0xffffff, 3.0, 8, Math.PI / 7, 0.4, 1.2);
+    spot.position.set(0.6, 2.6, 1.6);
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(1024, 1024);
+    this.scene.add(spot);
+    this.scene.add(spot.target);
+    this.spotLight = spot;
   }
 
   _buildRoom() {
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x0b1410, roughness: 0.95 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x162420, roughness: 0.95 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -60,7 +74,7 @@ class FlyDesk3D {
   }
 
   _buildDesk() {
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x2a1f18, roughness: 0.7 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20, roughness: 0.7 });
     const desk = new THREE.Group();
 
     const top = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.08, 1.3), woodMat);
@@ -147,14 +161,14 @@ class FlyDesk3D {
     fly.position.set(0, 0.92, 0.75);
     fly.rotation.y = Math.PI; // face the monitor
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x14201a, roughness: 0.4, metalness: 0.2 });
-    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0x5a0000, roughness: 0.3 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f3226, roughness: 0.35, metalness: 0.25 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xff4d4d, emissive: 0x7a0000, roughness: 0.25 });
     const wingMat = new THREE.MeshStandardMaterial({
-      color: 0x9fe8c8, transparent: true, opacity: 0.35, side: THREE.DoubleSide, roughness: 0.2,
+      color: 0x9fe8c8, transparent: true, opacity: 0.4, side: THREE.DoubleSide, roughness: 0.2,
     });
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x0c1512, roughness: 0.6 });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x14201a, roughness: 0.55 });
     const glowMat = new THREE.MeshStandardMaterial({
-      color: 0x14201a, emissive: 0x39ff6a, emissiveIntensity: 0.15, roughness: 0.4,
+      color: 0x1f3226, emissive: 0x39ff6a, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.25,
     });
 
     const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), glowMat);
@@ -222,6 +236,10 @@ class FlyDesk3D {
     this.fly = fly;
     this.flyParts = { wingL, wingR, antennaL, antennaR };
     this.scene.add(fly);
+
+    if (this.spotLight) {
+      this.spotLight.target.position.copy(fly.position);
+    }
   }
 
   _initControls() {
@@ -273,6 +291,7 @@ class FlyDesk3D {
     }
     if (this.fly) {
       this.fly.position.y = 0.92 + Math.sin(t * 1.6) * 0.01;
+      if (this.spotLight) this.spotLight.target.position.copy(this.fly.position);
     }
 
     if (this.controls) this.controls.update();
