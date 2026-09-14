@@ -133,18 +133,33 @@ class NeuronCanvas {
 
   // stepActivity: array of arrays, stepActivity[step][nodeIndex] = real rate value.
   // Node order must match the order this.nodes was set in (the /api/viz-subset response order).
+  //
+  // Normalized PER ROLE, not by one shared global max: R1-R6 (luminance-driven)
+  // activity runs ~100-200x larger in magnitude than R8 (chrominance) activity in
+  // practice, since the encoder's confidence-gated hue signal is naturally much
+  // smaller than raw luminance. A single global max makes the whole R8 lobe (and
+  // most hidden/output neurons) sit under the glow threshold permanently -- not
+  // silent, just ~200x dimmer than the R1-R6 side by comparison. Per-role scaling
+  // shows each channel's own internal activity pattern instead of only the
+  // largest-magnitude one.
   playSequence(stepActivity, verdict) {
     const token = ++this._playToken;
     this.verdictTint = null;
     if (!stepActivity || stepActivity.length === 0) return;
 
-    const maxVal = Math.max(1e-9, ...stepActivity.flat());
-    let step = 0;
+    const roleMax = {};
+    this.nodes.forEach((n, i) => {
+      const nodeMax = Math.max(...stepActivity.map((row) => row[i] ?? 0));
+      roleMax[n.role] = Math.max(roleMax[n.role] || 1e-9, nodeMax);
+    });
 
+    let step = 0;
     const advance = () => {
       if (token !== this._playToken) return; // superseded by a newer image
       const row = stepActivity[step];
-      this.activity = new Map(this.nodes.map((n, i) => [n.id, (row[i] ?? 0) / maxVal]));
+      this.activity = new Map(
+        this.nodes.map((n, i) => [n.id, (row[i] ?? 0) / roleMax[n.role]])
+      );
       step++;
       if (step < stepActivity.length) {
         setTimeout(advance, STEP_DURATION_MS);
