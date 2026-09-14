@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import deque
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
@@ -37,17 +38,31 @@ class ResultEvent:
 
 class EventBus:
     """Bridges the (synchronous, possibly-another-thread) processing loop to the
-    asyncio loop running the websocket server."""
+    asyncio loop running the websocket server.
 
-    def __init__(self) -> None:
+    A browser cold-start (page load, 3D scene init, websocket handshake) is
+    slower than the first few images can be processed, so a subscriber that
+    connects late would otherwise miss those early "result" events with no
+    way to recover them. A bounded replay buffer fixes that: every new
+    subscriber is caught up with the events published so far before it
+    starts receiving live ones. `_history` is only ever touched from
+    `_dispatch`, and `subscribe` always runs on the same asyncio loop thread
+    as `_dispatch` (scheduled via `call_soon_threadsafe`), so there's no race
+    between replay and live dispatch.
+    """
+
+    def __init__(self, history_limit: int = 500) -> None:
         self._subscribers: set[asyncio.Queue] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._history: deque[ResultEvent] = deque(maxlen=history_limit)
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
+        for event in self._history:
+            queue.put_nowait(event)
         self._subscribers.add(queue)
         return queue
 
@@ -60,5 +75,6 @@ class EventBus:
         self._loop.call_soon_threadsafe(self._dispatch, event)
 
     def _dispatch(self, event: ResultEvent) -> None:
+        self._history.append(event)
         for queue in list(self._subscribers):
             queue.put_nowait(event)

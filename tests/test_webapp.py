@@ -124,3 +124,25 @@ def test_websocket_delivers_result_event():
             data = ws.receive_json()
             assert data["type"] == "started"
             assert data["total_images"] == 5
+
+
+def test_websocket_replays_events_published_before_it_connected():
+    # A browser cold-start (page load, 3D scene init, websocket handshake) is
+    # slower than the first few images can be processed -- a late-connecting
+    # client must still see those early events, not just ones published after
+    # it subscribed.
+    bus = EventBus()
+    app = create_app(bus)
+    with TestClient(app) as client:
+        bus.publish(ResultEvent(type="started", total_images=3))
+        bus.publish(ResultEvent(type="result", path="a.png", processed_images=1))
+        bus.publish(ResultEvent(type="result", path="b.png", processed_images=2))
+        with client.websocket_connect("/ws") as ws:
+            first = ws.receive_json()
+            second = ws.receive_json()
+            third = ws.receive_json()
+            assert [first["type"], second["path"], third["path"]] == [
+                "started",
+                "a.png",
+                "b.png",
+            ]

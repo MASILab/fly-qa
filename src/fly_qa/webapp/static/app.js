@@ -12,11 +12,6 @@ const tallyEls = {
 };
 const progressFill = document.getElementById("progress-fill");
 const progressLabel = document.getElementById("progress-label");
-const currentPath = document.getElementById("current-path");
-const currentVerdict = document.getElementById("current-verdict");
-const currentScores = document.getElementById("current-scores");
-const currentReason = document.getElementById("current-reason");
-const currentThumb = document.getElementById("current-thumb");
 const resultsBody = document.getElementById("results-body");
 
 const MAX_ROWS = 200;
@@ -75,39 +70,18 @@ function handleEvent(event) {
   }
 
   if (event.type === "finished") {
-    currentPath.textContent = "done. click any row below to review it.";
-    currentVerdict.textContent = "";
-    currentScores.textContent = "";
-    currentReason.textContent = "";
+    // no-op: the table itself is the record of what happened.
   }
 }
 
-// Renders one previously-received result into the "current image" panel and
-// replays its real per-step neuron activity. Used both for the live-following
+// Replays one previously-received result's real per-step neuron activity and
+// puts its image up on the fly's monitor. Used both for the live-following
 // display and for reviewing an earlier image by clicking its row.
 function showResult(path) {
   const event = resultsByPath.get(path);
   if (!event) return;
   selectedPath = path;
 
-  const filename = path.split("/").pop();
-  currentPath.textContent = filename;
-  currentVerdict.textContent = event.verdict.toUpperCase();
-  currentVerdict.className = `current-verdict ${event.verdict}`;
-
-  if (event.fed_to_connectome) {
-    currentScores.textContent =
-      `confidence=${event.confidence_signal.toExponential(3)} (drives verdict)  ` +
-      `defect_score=${event.defect_score.toExponential(3)} (reported only)` +
-      (event.calibrated ? "" : "  (UNCALIBRATED thresholds)");
-    currentReason.textContent = "";
-  } else {
-    currentScores.textContent = "not fed to connectome -- precheck failed";
-    currentReason.textContent = event.precheck_findings.join("; ");
-  }
-
-  currentThumb.src = imageUrl(path);
-  currentThumb.hidden = false;
   if (flyDesk) flyDesk.setScreenImage(imageUrl(path));
 
   if (event.step_activity) {
@@ -119,11 +93,24 @@ function showResult(path) {
 
 function addResultRow(event) {
   const filename = event.path.split("/").pop();
+  const confidence = event.fed_to_connectome ? event.confidence_signal.toExponential(3) : "n/a";
   const score = event.fed_to_connectome ? event.defect_score.toExponential(3) : "n/a";
   const row = document.createElement("tr");
   row.dataset.path = event.path;
+
+  let title;
+  if (event.fed_to_connectome) {
+    title =
+      `confidence=${event.confidence_signal.toExponential(3)} (drives verdict)  ` +
+      `defect_score=${event.defect_score.toExponential(3)} (reported only)` +
+      (event.calibrated ? "" : "  (UNCALIBRATED thresholds)");
+  } else {
+    title = `not fed to connectome -- precheck failed: ${event.precheck_findings.join("; ")}`;
+  }
+
   row.innerHTML = `
-    <td><button type="button" class="image-link">${escapeHtml(filename)}</button></td>
+    <td><button type="button" class="image-link" title="${escapeHtml(title)}">${escapeHtml(filename)}</button></td>
+    <td>${confidence}</td>
     <td>${score}</td>
     <td class="status-${event.verdict}">${event.verdict}</td>
   `;

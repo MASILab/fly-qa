@@ -19,6 +19,14 @@ class FlyDesk3D {
     this._buildFly();
     this._initControls();
 
+    // The canvas's box height is driven by flex layout (matching the status+brain
+    // panels' combined height in the sibling column), not a fixed aspect-ratio --
+    // it can change independent of window resize (e.g. results table growing).
+    // Without watching for that, the CSS box and the WebGL pixel buffer drift out
+    // of sync and the browser stretches the rendered image to fit (see the same
+    // fix applied to neuron_canvas.js for the full explanation).
+    const observer = new ResizeObserver(() => this._resize());
+    observer.observe(this.canvas);
     window.addEventListener("resize", () => this._resize());
     this._resize();
     this._animate();

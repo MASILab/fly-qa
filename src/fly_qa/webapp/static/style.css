@@ -28,7 +28,22 @@ header {
   border-bottom: 1px solid var(--line);
   padding-bottom: 12px;
   margin-bottom: 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
 }
+
+.header-title { flex: 1 1 auto; min-width: 260px; }
+
+.header-status {
+  flex: 0 1 420px;
+  min-width: 260px;
+}
+
+.header-status .tally-row { margin-bottom: 8px; }
+.header-status .progress-row { margin-bottom: 0; }
 
 h1 {
   margin: 0;
@@ -58,17 +73,31 @@ h1 .accent { color: var(--output-color); }
   letter-spacing: 0.02em;
 }
 
+/* Layout: tally/progress live in the header strip (out of the way of the
+   table), fly desk fills the left column (both rows), and the right column
+   stacks a scrollable QA table (fills remaining space) over a fixed-height
+   neuron diagram (does NOT shrink as the table grows -- see .brain-panel's
+   explicit height below). Sized to fit a typical screen without page-level
+   scrolling; the table scrolls internally instead. */
 main {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  align-items: start;
-  gap: 20px;
-  max-width: 1500px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 16px;
+  max-width: 1600px;
+  height: calc(100vh - 160px);
+  min-height: 600px;
   margin: 0 auto;
 }
 
 @media (max-width: 900px) {
-  main { grid-template-columns: 1fr; }
+  main {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    height: auto;
+  }
+  .desk-panel { grid-row: auto !important; }
+  .brain-panel { height: 340px !important; }
 }
 
 .brain-panel, .status-panel, .desk-panel {
@@ -79,14 +108,17 @@ main {
 }
 
 .desk-panel {
-  grid-column: 1 / -1;
+  grid-column: 1;
+  grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 #fly-desk-canvas {
   width: 100%;
-  aspect-ratio: 21 / 9;
+  flex: 1;
+  min-height: 0;
   background: #05080a;
   border-radius: 3px;
   cursor: grab;
@@ -96,15 +128,29 @@ main {
   cursor: grabbing;
 }
 
+.status-panel {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .brain-panel {
+  grid-column: 2;
+  grid-row: 2;
+  height: 340px;
+  flex: none;
   position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 #brain-canvas {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  flex: 1;
+  min-height: 0;
   background: radial-gradient(ellipse at center, #0d1a12 0%, #05080a 80%);
   border-radius: 3px;
 }
@@ -128,8 +174,12 @@ main {
   border: 1px solid var(--line);
   border-radius: 3px;
   text-align: center;
-  padding: 10px 4px;
+  padding: 4px 10px;
+  min-width: 60px;
 }
+
+.header-status .tally span { font-size: 1.15rem; }
+.header-status .tally { padding: 3px 8px; }
 
 .tally span {
   display: block;
@@ -177,68 +227,26 @@ main {
   white-space: nowrap;
 }
 
-.current-image {
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 10px 12px;
-  margin-bottom: 16px;
-  min-height: 60px;
-}
-
-.current-image-body {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.current-thumb {
-  width: 90px;
-  height: 180px;
-  object-fit: cover;
-  object-position: top;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: #0d1a12;
-  flex-shrink: 0;
-}
-
-.current-details {
+.results-table-wrap {
   flex: 1;
-  min-width: 0;
-}
-
-.current-path {
-  font-size: 0.82rem;
-  word-break: break-all;
-}
-
-.current-verdict {
-  font-weight: bold;
-  letter-spacing: 0.08em;
-  margin-top: 4px;
-  text-transform: uppercase;
-}
-
-.current-verdict.pass { color: var(--pass); }
-.current-verdict.flag { color: var(--flag); }
-.current-verdict.fail { color: var(--fail); }
-
-.current-scores, .current-reason {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  margin-top: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 3px;
 }
 
 .results-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.72rem;
-  max-height: 340px;
-  display: block;
-  overflow-y: auto;
 }
 
-.results-table thead { color: var(--text-dim); }
+.results-table thead {
+  color: var(--text-dim);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
 
 .results-table th, .results-table td {
   text-align: left;
