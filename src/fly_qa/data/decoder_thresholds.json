@@ -2,7 +2,7 @@
   "confidence_fail_max": 4.692771208026935e-06,
   "confidence_flag_max": 4.736919046943899e-06,
   "calibrated": true,
-  "generated_at": "2026-09-14T19:02:38.849043+00:00",
+  "generated_at": "2026-09-17T15:27:02.231477+00:00",
   "notes": {
     "calibration_method": "real_labels",
     "n_good": 150,

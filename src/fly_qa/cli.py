@@ -16,6 +16,7 @@ import argparse
 import csv
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from fly_qa.connectome_data import (
@@ -26,24 +27,55 @@ from fly_qa.connectome_data import (
 )
 from fly_qa.decoder import DecoderThresholds
 from fly_qa.events import EventBus, ResultEvent
-from fly_qa.pipeline import R8_TYPES, PipelineConfig, run_pipeline
+from fly_qa.pipeline import R8_TYPES, PipelineConfig, PipelineResult, run_pipeline
 from fly_qa.simulator import ConnectomeSimulator
 from fly_qa.thresholds_store import load_thresholds
 from fly_qa.viz import pick_visualization_subset
 
 BANNER = "*** EXPERIMENTAL / UNVALIDATED -- research/art exercise, not a validated defect classifier ***"
 
+# MASI-QA core columns (https://github.com/MASILab/masi-qa QA.csv), followed by
+# fly_qa-specific detail columns not present in that format.
 RESULT_FIELDNAMES = [
-    "path",
+    "filename",
+    "QA_status",
+    "reason",
+    "user",
+    "date",
+    "duration",
+    "verdict",
+    "defect_score",
+    "confidence_signal",
     "precheck_passed",
     "precheck_findings",
     "fed_to_connectome",
-    "defect_score",
-    "confidence_signal",
-    "verdict",
     "calibrated",
-    "duration_sec",
 ]
+
+# fly_qa verdicts (pass/fail/flag, see CLAUDE.md) map onto MASI-QA's QA_status vocabulary.
+VERDICT_TO_QA_STATUS = {"pass": "yes", "fail": "no", "flag": "maybe"}
+
+
+def build_result_row(result: PipelineResult, now: datetime | None = None) -> dict:
+    if now is None:
+        now = datetime.now()
+    return {
+        "filename": str(result.path),
+        "QA_status": VERDICT_TO_QA_STATUS[result.verdict],
+        "reason": "; ".join(result.precheck_findings) if not result.precheck_passed else "",
+        "user": "fly",
+        "date": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "duration": result.duration_sec,
+        "verdict": result.verdict,
+        "defect_score": result.defect_score if result.defect_score is not None else "",
+        "confidence_signal": result.confidence_signal
+        if result.confidence_signal is not None
+        else "",
+        "precheck_passed": result.precheck_passed,
+        "precheck_findings": "; ".join(result.precheck_findings),
+        "fed_to_connectome": result.fed_to_connectome,
+        "calibrated": result.calibrated,
+    }
 
 
 def resolve_thresholds(
@@ -231,23 +263,7 @@ def run(
             path, simulator, config, thresholds, capture_body_ids=capture_body_ids
         )
         tally[result.verdict] += 1
-        rows.append(
-            {
-                "path": str(result.path),
-                "precheck_passed": result.precheck_passed,
-                "precheck_findings": "; ".join(result.precheck_findings),
-                "fed_to_connectome": result.fed_to_connectome,
-                "defect_score": result.defect_score
-                if result.defect_score is not None
-                else "",
-                "confidence_signal": result.confidence_signal
-                if result.confidence_signal is not None
-                else "",
-                "verdict": result.verdict,
-                "calibrated": result.calibrated,
-                "duration_sec": result.duration_sec,
-            }
-        )
+        rows.append(build_result_row(result))
         print(
             f"  [{i}/{len(pngs)}] {path.name}: {result.verdict} "
             f"(precheck={'pass' if result.precheck_passed else 'FAIL'}, {result.duration_sec}s)"
